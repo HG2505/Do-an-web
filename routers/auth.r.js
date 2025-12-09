@@ -1,15 +1,20 @@
-const express = require('express');
-const authController = require('../controllers/auth.c'); 
+import express from 'express';
+import authController from '../controllers/auth.c.js';
 
 const router = express.Router();
 
-router.get('/register', authController.getRegister);
-router.post('/register', authController.postRegister);
+// --- Định nghĩa các đường dẫn (Route) ---
 
-router.get('/login', authController.getLogin);
+// 1. Đăng nhập (GET để hiện form, POST để xử lý)
+router.get('/login', authController.login);
 router.post('/login', authController.postLogin);
 
-router.post('/logout', authController.logout);
-router.get('/logout', authController.logout);
+// 2. Đăng ký (GET để hiện form, POST để xử lý)
+router.get('/register', authController.register);
+router.post('/register', authController.postRegister);
 
-module.exports = router;
+// 3. Đăng xuất
+router.get('/logout', authController.logout);
+router.post('/logout', authController.logout);
+
+export default router;

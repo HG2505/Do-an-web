@@ -2,34 +2,47 @@ import express from 'express';
 import { create } from 'express-handlebars';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import session from 'express-session'; // Import session
+import session from 'express-session';
 import 'dotenv/config';
 
-// Import Router
-import siteRouter from './routers/site.r.js'; 
+// Import các Router
+import siteRouter from './routers/site.r.js';
+import authRouter from './routers/auth.r.js';
+// *Lưu ý: Đảm bảo các file này nằm trong thư mục 'routers' và có đuôi .js
 
 const app = express();
 const port = 3000;
 
-// Cấu hình đường dẫn
+// Cấu hình đường dẫn cho module ES (import.meta.url)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 1. Cấu hình Session (Quan trọng cho chức năng Đăng nhập sau này)
+// ============================================================
+// 1. CẤU HÌNH SESSION
+// ============================================================
 app.use(session({
     secret: process.env.SESSION_SECRET || 'secret_key_123',
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false } // false khi chạy localhost
+    // Nên đặt cookie maxAge nếu muốn tính năng "Ghi nhớ đăng nhập" hoạt động lâu hơn
+    cookie: { secure: false } 
 }));
 
-// 2. Middleware để đọc dữ liệu từ Form và JSON
+// 2. Middleware đọc dữ liệu
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// 3. Middleware truyền thông tin User xuống View (Để hiển thị tên trên Menu)
+// 3. Middleware User (Truyền user xuống View)
 app.use((req, res, next) => {
-    res.locals.user = req.session.user || null;
+    // Đặt biến cục bộ để sử dụng trong Handlebars
+    if (req.session.user) {
+        res.locals.user = req.session.user;
+        res.locals.isAuth = true;
+    } else {
+        res.locals.isAuth = false;
+    }
+    // LƯU Ý: Nếu muốn dùng Bootstrap, cần đặt path cho public/assets
+    res.locals.isAuth = req.session.isAuth || false; // Dùng req.session.isAuth nếu bạn đặt nó trong auth.c.js
     next();
 });
 
@@ -41,11 +54,9 @@ const hbs = create({
     defaultLayout: 'main',
     helpers: {
         sum: (a, b) => a + b,
-        // Helper so sánh (Dùng function thường để giữ context 'this')
-        ifEquals: function (a, b, options) {
-            return (a == b) ? options.fn(this) : options.inverse(this);
-        },
-        // Helper tạo vòng lặp số trang (Cho chức năng Phân trang của Member 3)
+        // Helper ifEquals đã đúng, dùng cho so sánh giá trị
+        ifEquals: (a, b, options) => (a == b) ? options.fn(this) : options.inverse(this),
+        // Helper pages đã đúng, dùng cho phân trang
         pages: function(n, options) {
             let accum = '';
             for (let i = 1; i <= n; ++i) {
@@ -62,12 +73,19 @@ const hbs = create({
 app.engine('.hbs', hbs.engine);
 app.set('view engine', '.hbs');
 app.set('views', path.join(__dirname, 'views'));
-
-// Cấu hình file tĩnh (CSS, Ảnh, JS)
 app.use(express.static(path.join(__dirname, 'assets')));
 
-// 5. Kết nối Router (Thay thế cho route test cũ)
-app.use('/', siteRouter);
+
+// ============================================================
+// 5. KẾT NỐI ROUTER
+// ============================================================
+
+// 5a. Router XÁC THỰC (Phải đặt trước các route cần bảo vệ)
+app.use('/', authRouter); 
+
+// 5b. Router TRANG CHỦ & CÁC ROUTE KHÁC
+app.use('/', siteRouter); 
+
 
 // Khởi động Server
 app.listen(port, () => {
